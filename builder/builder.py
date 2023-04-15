@@ -5,18 +5,19 @@ import exceptions
 from pathlib import Path
 
 
-FILE_EXTENSIONS = ('cpp', 'c', 'h', 'hpp')
-C_COMPILER_NAMES = ('gcc', 'clang', 'icc')
-CXX_COMPILER_NAMES = ('g++', 'clang++', 'icc')
+FILE_EXTENSIONS = frozenset('cpp', 'c', 'h', 'hpp')
+C_COMPILER_NAMES = frozenset('gcc', 'clang', 'icc')
+CXX_COMPILER_NAMES = frozenset('g++', 'clang++', 'icpc')
 
 class Builder():
     def __init__(self, mainfile='', language='cxx', compiler_path='', compile_mode=''):
         '''
-        Base builder for C/C++ projects.\n
+        Base builder for C/C++ projects.
+
         Params:
-        mainfile - path to file with main function;
-        language - str is one of for C++: {'c++', 'c plus plus', 'cplusplus', 'cxx'}, for C: {'c'}, sets language mode;
-        compiler_path - path to compiler on computer.
+        mainfile: str, path to file with main function.
+        language: str, is one of for C++: {'c++', 'c plus plus', 'cplusplus', 'cxx'}, for C: {'c'}, sets language mode.
+        compiler_path: str, path to compiler on system.
         '''
         self.mainfile = mainfile
 
@@ -31,28 +32,32 @@ class Builder():
 
     def set_language(self, language: str) -> str:
         '''
-        Method to set language mode.\n
-        language is one of C++: {'c++', 'c plus plus', 'cplusplus', 'cxx'}, for C: {'c'}\n
-        Returns language.\n
-        Raises exception if language is undefined.\n
+        Method to set language mode.
+
+        Params:
+        language: str, one of C++: {'c++', 'c plus plus', 'cplusplus', 'cxx'}, for C: {'c'}.
+        
+        Returns: None.
+        
+        Raises: UndefinedLanguageMode, if language is undefined.
         '''
         languages = {'C++': ('c++', 'c plus plus',
                              'cplusplus', 'cxx'), 'C': ('c',)}
         for key, values in languages:
             if language.lower() in values:
-                self._language = key
-                return self._language
+                self.language_ = key
+                return self.language_
         raise exceptions.UndefinedLanguageMode(language)
 
     def set_compiler_path(self, path) -> str:
         if path:
-            self._compiler = path
-            return self._compiler
+            self.compiler_ = path
+            return self.compiler_
         else:
             self._set_compiler_path()
 
     def _set_compiler_path(self) -> None:
-        if self._language == 'C++':
+        if self.language_ == 'C++':
             compiler_names = CXX_COMPILER_NAMES
         else:
             compiler_names = C_COMPILER_NAMES
@@ -62,7 +67,7 @@ class Builder():
                 try:
                     result = subprocess.run(
                         ['which', name], stdout=subprocess.PIPE, check=True)
-                    self._compiler = result.stdout.decode().strip()
+                    self.compiler_ = result.stdout.decode().strip()
                     return
                 except subprocess.CalledProcessError:
                     continue
@@ -70,26 +75,37 @@ class Builder():
                 try:
                     result = subprocess.run(
                         ['where', name], stdout=subprocess.PIPE, check=True)
-                    self._compiler = result.stdout.decode().split('\r\n')[
+                    self.compiler_ = result.stdout.decode().split('\r\n')[
                         0].strip()
                     return
                 except subprocess.CalledProcessError:
                     continue
         raise exceptions.UndefinedCompiler(
-            self._compiler, self._language)
+            self.compiler_, self.language_)
 
     def add_libraries(self, dir='') -> None:
+        '''
+        Adds files with {".h", ".cpp", ".c", ".hpp"}
+        in directory and subdirectories.
+
+        Params:
+        dir: str, path to the directory with files.
+        
+        Returns: None.
+        '''
         dir = Path()
         for entry in dir.glob('**/*'):
             if entry.is_file() and (entry.name[entry.rfind('.'):] in FILE_EXTENSIONS):
                 self.libraries.append(str(entry.absolute()))
 
-    # def add_library(self, header_path, source_path) -> None:
-    #     header_path, source_path = Path(header_path), Path(source_path)
-    #     if header_path.is_file() and (header_path.name.split('.')[-1] in FILE_EXTENSIONS):
-    #         self.libraries.append(header_path.absolute())
-    #     else:
-    #         pass
+    def add_library(self, header_path, source_path) -> None:
+        header_path, source_path = Path(header_path), Path(source_path)
+        for path in (header_path, source_path):
+            if path.is_file():
+                absolute_path = str(path.absolute())
+                if absolute_path not in self.libraries:
+                    self.libraries.append(absolute_path)
+    
 
 
 
